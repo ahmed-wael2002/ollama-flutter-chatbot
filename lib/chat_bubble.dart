@@ -29,7 +29,7 @@ class ChatBubble extends StatelessWidget {
           ),
           child: Container(
             padding: const EdgeInsets.all(12),
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+            margin: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: message.isUser
                   ? Theme.of(context).colorScheme.primary
@@ -74,7 +74,7 @@ class ChatBubble extends StatelessWidget {
                 ),
                 if (!message.isUser) // Show copy button only for user messages
                   IconButton(
-                    icon: const Icon(Icons.copy, color: Colors.white),
+                    icon: Icon(Icons.copy, color: Theme.of(context).colorScheme.surface, size: 18,),
                     onPressed: () => _copyToClipboard(context),
                     tooltip: 'Copy',
                   ),
