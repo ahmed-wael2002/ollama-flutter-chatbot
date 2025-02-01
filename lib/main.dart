@@ -13,12 +13,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'Ollama Chat',
       theme: ThemeData(
         textTheme: GoogleFonts.poppinsTextTheme(),
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.tealAccent, brightness: Brightness.dark),
         useMaterial3: true,
       ),
+      debugShowCheckedModeBanner: false,
       home: ChatScreen(),
     );
   }
