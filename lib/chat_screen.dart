@@ -46,7 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
         messages.add(response);
       });
     } catch (e) {
-      _showError("Failed to connect to AI: $e");
+      _showError("Failed to connect to Ollama: Make sure Ollama is running in the background");
     } finally {
       setState(() => _isLoading = false);
       _scrollToBottom();
@@ -55,7 +55,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _showError(String errorMessage) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(errorMessage)),
+      SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
     );
   }
 

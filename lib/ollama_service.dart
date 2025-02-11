@@ -42,12 +42,15 @@ class OllamaService {
 
           return aiMessage;
         } else {
-          return Message(date: DateTime.now(), text: "Error: ${response.statusCode}", isUser: false);
+          throw Exception("Error: ${response.statusCode}");
+          // return Message(date: DateTime.now(), text: "Error: ${response.statusCode}", isUser: false);
         }
       } catch (e) {
+        // rethrow;
         attempt++;
         if (attempt >= retries) {
-          return Message(date: DateTime.now(), text: "Error: $e", isUser: false);
+          // return Message(date: DateTime.now(), text: "Error: $e", isUser: false);
+          rethrow;
         } else {
           await Future.delayed(const Duration(seconds: 1));
         }
