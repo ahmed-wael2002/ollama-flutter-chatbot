@@ -39,7 +39,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       // Send the full chat history for multi-turn conversations
-      Message response = await ollamaService.sendMessage(userMessage);
+      // Message response = await ollamaService.sendMessage(userMessage);
+      Message response = await ollamaService.sendChat(messages);
 
       setState(() {
         messages.add(response);
