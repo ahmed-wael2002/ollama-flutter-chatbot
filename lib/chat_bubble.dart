@@ -1,8 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // For clipboard support
+import 'package:flutter_highlight/themes/dracula.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_highlight/flutter_highlight.dart';
+import 'package:flutter_highlight/themes/github.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'message.dart';
+
+class CodeHighlighter extends SyntaxHighlighter {
+  @override
+  TextSpan format(String source) {
+    return TextSpan(
+      style: const TextStyle(fontFamily: 'monospace'),
+      children: [
+        WidgetSpan(
+          child: HighlightView(
+            source,
+            language: 'dart', // Change based on expected code language
+            theme: draculaTheme, // Choose a theme (e.g., draculaTheme, atomOneDarkTheme)
+            padding: const EdgeInsets.all(8),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class ChatBubble extends StatelessWidget {
   final Message message;
@@ -24,8 +46,8 @@ class ChatBubble extends StatelessWidget {
       children: [
         ConstrainedBox(
           constraints: BoxConstraints(
-            minWidth: 50, // Prevents the bubble from being too small
-            maxWidth: MediaQuery.of(context).size.width * 0.75, // Adaptive max width
+            minWidth: 50,
+            maxWidth: MediaQuery.of(context).size.width * 0.75,
           ),
           child: Container(
             padding: const EdgeInsets.all(12),
@@ -45,36 +67,43 @@ class ChatBubble extends StatelessWidget {
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Padding(
-                  padding: const EdgeInsets.only(right: 4), // Space for copy button
+                  padding: const EdgeInsets.only(right: 4),
                   child: message.isUser
                       ? SelectableText(
                     message.text,
                     style: TextStyle(
-                        color: Theme.of(context).colorScheme.surface,
+                      color: Theme.of(context).colorScheme.surface,
                     ),
                   )
                       : MarkdownBody(
                     data: message.text,
                     selectable: true,
+                    syntaxHighlighter: CodeHighlighter(), // Use custom highlighter
                     styleSheet: MarkdownStyleSheet(
                       code: TextStyle(
                         color: Theme.of(context).colorScheme.surface,
                         fontFamily: GoogleFonts.jetBrainsMono().fontFamily,
                       ),
                       codeblockDecoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.secondaryFixedDim,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .secondaryFixedDim,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       p: TextStyle(
-                          color: Theme.of(context).colorScheme.surface,
+                        color: Theme.of(context).colorScheme.surface,
                         fontFamily: GoogleFonts.poppins().fontFamily,
                       ),
                     ),
                   ),
                 ),
-                if (!message.isUser) // Show copy button only for user messages
+                if (!message.isUser)
                   IconButton(
-                    icon: Icon(Icons.copy, color: Theme.of(context).colorScheme.surface, size: 18,),
+                    icon: Icon(
+                      Icons.copy,
+                      color: Theme.of(context).colorScheme.surface,
+                      size: 18,
+                    ),
                     onPressed: () => _copyToClipboard(context),
                     tooltip: 'Copy',
                   ),
