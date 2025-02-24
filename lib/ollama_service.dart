@@ -27,6 +27,11 @@ class OllamaService {
             "model": "deepseek-coder:6.7b",
             "messages": chatHistory.map((msg) => msg.toJson()).toList(),
             "stream": false,
+            "options": {
+              "num_gpu": 1, // Use 1 GPU
+              "numa": true, // Enable NUMA optimization
+              "num_thread": 4 // Adjust thread count as needed
+            }
           },
         );
 
@@ -111,6 +116,11 @@ class OllamaService {
           "model": "deepseek-coder:6.7b",
           "messages": chatHistory.map((msg) => msg.toJson()).toList(),
           "stream": true,
+          "options": {
+            "num_gpu": 1, // Use 1 GPU
+            "numa": true, // Enable NUMA optimization
+            "num_thread": 4 // Adjust thread count as needed
+          }
         },
         options: Options(
           responseType: ResponseType.stream,
@@ -131,6 +141,12 @@ class OllamaService {
       }
     } catch (e) {
       print('Stream error: $e');
+      if (e.toString().contains('CUDA')) {
+        if (!(_responseStreamController?.isClosed ?? true)) {
+          _responseStreamController?.addError(
+              'GPU not available or CUDA error occurred. Falling back to CPU.');
+        }
+      }
       if (!(_responseStreamController?.isClosed ?? true)) {
         _responseStreamController?.addError(e);
       }
