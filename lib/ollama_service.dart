@@ -1,20 +1,20 @@
 import 'package:dio/dio.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data'; // Add this import for Uint8List
+import 'dart:typed_data';
 import 'message.dart';
 
 class OllamaService {
   final Dio _dio = Dio(
     BaseOptions(
-      baseUrl: 'http://localhost:11434/api', // Local Ollama API
+      baseUrl: 'http://localhost:11434/api',
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
     ),
   );
 
-  // Stores chat history for context
   final List<Message> _chatHistory = [];
+  final Map<String, CachedResponse> _cache = {};
 
   // Handles sending chat messages
   Future<Message> sendChat(List<Message> chatHistory, {int retries = 3}) async {
@@ -66,9 +66,17 @@ class OllamaService {
         isUser: false);
   }
 
-  // Uses chat history for contextual responses
   Future<Message> sendMessage(String userInput) async {
-    // Create user message and add it to history
+    // Check cache first
+    if (_cache.containsKey(userInput)) {
+      final cached = _cache[userInput]!;
+      if (!cached.isExpired(DateTime.now())) {
+        return cached.response;
+      } else {
+        _cache.remove(userInput); // Remove expired cache entry
+      }
+    }
+
     Message userMessage = Message(
       date: DateTime.now(),
       text: userInput,
@@ -76,20 +84,8 @@ class OllamaService {
     );
     _chatHistory.add(userMessage);
 
-    // Send chat history to Ollama
-    return await sendChat(_chatHistory);
-  }
-
-  // Optimized version with caching to avoid redundant API calls
-  final Map<String, Message> _cache = {};
-
-  Future<Message> sendMessageWithCache(String userInput) async {
-    if (_cache.containsKey(userInput)) {
-      return _cache[userInput]!;
-    }
-
-    Message response = await sendMessage(userInput);
-    _cache[userInput] = response;
+    final response = await sendChat(_chatHistory);
+    _cache[userInput] = CachedResponse(response);
     return response;
   }
 
@@ -104,9 +100,10 @@ class OllamaService {
     return _currentStream!;
   }
 
-  Future<void> sendChatUsingStream(List<Message> chatHistory) async {
-    String fullResponse = '';
+  final _responseBuffer = StringBuffer();
+  bool _isProcessingChunk = false;
 
+  Future<void> sendChatUsingStream(List<Message> chatHistory) async {
     try {
       final response = await _dio.post(
         '/chat',
@@ -122,38 +119,15 @@ class OllamaService {
       );
 
       final Stream<Uint8List> stream = response.data.stream;
+      _responseBuffer.clear();
 
       await for (final data in stream) {
         if (_responseStreamController?.isClosed ?? true) break;
 
         final String chunk = utf8.decode(data);
-        if (chunk.isNotEmpty) {
-          // Fixed syntax error here
-          final lines = chunk.split('\n');
-          for (final line in lines) {
-            if (line.isEmpty) continue;
-            try {
-              final Map<String, dynamic> json = jsonDecode(line);
+        if (chunk.isEmpty) continue;
 
-              if (json.containsKey('message')) {
-                final String text = json['message']['content'] ?? '';
-                if (text.isNotEmpty) {
-                  fullResponse += text;
-                  _responseStreamController?.add(fullResponse);
-                }
-              }
-
-              if (json.containsKey('done') && json['done'] == true) {
-                if (!(_responseStreamController?.isClosed ?? true)) {
-                  await _responseStreamController?.close();
-                }
-                return;
-              }
-            } catch (e) {
-              print('Error processing chunk: $e');
-            }
-          }
-        }
+        await _processStreamChunk(chunk);
       }
     } catch (e) {
       print('Stream error: $e');
@@ -162,8 +136,57 @@ class OllamaService {
     }
   }
 
+  Future<void> _processStreamChunk(String chunk) async {
+    if (_isProcessingChunk) return;
+    _isProcessingChunk = true;
+
+    try {
+      final lines = chunk.split('\n');
+      for (final line in lines) {
+        if (line.isEmpty) continue;
+
+        try {
+          final json = jsonDecode(line);
+
+          if (json.containsKey('message')) {
+            final String text = json['message']['content'] ?? '';
+            if (text.isNotEmpty) {
+              _responseBuffer.write(text);
+              _responseStreamController?.add(_responseBuffer.toString());
+            }
+          }
+
+          if (json['done'] == true) {
+            await _responseStreamController?.close();
+            return;
+          }
+        } catch (e) {
+          print('Error processing chunk: $e');
+        }
+      }
+    } finally {
+      _isProcessingChunk = false;
+    }
+  }
+
+  void clearExpiredCache() {
+    final now = DateTime.now();
+    _cache.removeWhere((_, cached) => cached.isExpired(now));
+  }
+
   void dispose() {
     _responseStreamController?.close();
     _responseStreamController = null;
+    _cache.clear();
   }
+}
+
+class CachedResponse {
+  final Message response;
+  final DateTime expiry;
+
+  CachedResponse(this.response)
+      : expiry = DateTime.now().add(const Duration(minutes: 30));
+
+  bool isExpired(DateTime now) => now.isAfter(expiry);
 }
