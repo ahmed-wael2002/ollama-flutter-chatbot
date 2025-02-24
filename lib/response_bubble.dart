@@ -39,7 +39,10 @@ class ResponseBubble extends StatelessWidget {
       stream: stream,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Text('Error: ${snapshot.error}');
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            onComplete?.call(''); // Notify completion with empty response
+          });
+          return const SizedBox.shrink(); // Don't show error in bubble
         }
 
         if (!snapshot.hasData) {

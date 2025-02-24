@@ -44,8 +44,23 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       await ollamaService.sendChatUsingStream(messages);
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showError("Failed to connect to Ollama: ${e.toString()}");
+      if (!mounted) return;
+
+      setState(() {
+        _isLoading = false;
+        currentStreamingMessage = null;
+      });
+
+      ollamaService.closeStream();
+
+      String errorMessage = "Connection failed: ";
+      if (e.toString().contains("Connection refused")) {
+        errorMessage += "Please check if Ollama is running";
+      } else {
+        errorMessage += e.toString();
+      }
+
+      _showError(errorMessage);
     }
   }
 
@@ -58,6 +73,13 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Theme.of(context).colorScheme.error,
         behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: Theme.of(context).colorScheme.onError,
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          },
+        ),
       ),
     );
   }
@@ -106,11 +128,13 @@ class _ChatScreenState extends State<ChatScreen> {
                         stream: ollamaService.responseStream,
                         onComplete: (finalResponse) {
                           setState(() {
-                            messages.add(Message(
-                              date: DateTime.now(),
-                              text: finalResponse,
-                              isUser: false,
-                            ));
+                            if (finalResponse.isNotEmpty) {
+                              messages.add(Message(
+                                date: DateTime.now(),
+                                text: finalResponse,
+                                isUser: false,
+                              ));
+                            }
                             _isLoading = false;
                           });
                           _scrollToBottom();
@@ -132,6 +156,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     ollamaService.dispose();
+    ollamaService.closeStream(); // Ensure stream is closed when disposing
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();

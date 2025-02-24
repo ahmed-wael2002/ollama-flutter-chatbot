@@ -131,8 +131,10 @@ class OllamaService {
       }
     } catch (e) {
       print('Stream error: $e');
-      _responseStreamController?.addError(e);
-      await _responseStreamController?.close();
+      if (!(_responseStreamController?.isClosed ?? true)) {
+        _responseStreamController?.addError(e);
+      }
+      rethrow; // Rethrow to be caught by the UI layer
     }
   }
 
@@ -174,9 +176,16 @@ class OllamaService {
     _cache.removeWhere((_, cached) => cached.isExpired(now));
   }
 
-  void dispose() {
-    _responseStreamController?.close();
+  void closeStream() {
+    if (!(_responseStreamController?.isClosed ?? true)) {
+      _responseStreamController?.close();
+    }
     _responseStreamController = null;
+    _responseBuffer.clear();
+  }
+
+  void dispose() {
+    closeStream();
     _cache.clear();
   }
 }
