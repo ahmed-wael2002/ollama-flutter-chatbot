@@ -3,7 +3,6 @@ import 'package:flutter/services.dart'; // For clipboard support
 import 'package:flutter_highlight/themes/dracula.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_highlight/flutter_highlight.dart';
-import 'package:flutter_highlight/themes/github.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'message.dart';
 

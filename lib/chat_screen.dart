@@ -3,6 +3,7 @@ import 'package:ollama_chatbot/chat_bubble.dart';
 import 'package:ollama_chatbot/message.dart';
 import 'package:ollama_chatbot/ollama_service.dart';
 import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:ollama_chatbot/response_bubble.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -18,6 +19,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   List<Message> messages = [];
   bool _isLoading = false; // Tracks API call status
+  String? currentStreamingMessage;
 
   // Sends the user message to Ollama
   Future<void> _sendMessage() async {
@@ -33,23 +35,15 @@ class _ChatScreenState extends State<ChatScreen> {
         isUser: true,
       ));
       _isLoading = true;
+      currentStreamingMessage = '';
     });
 
     _scrollToBottom();
 
     try {
-      // Send the full chat history for multi-turn conversations
-      // Message response = await ollamaService.sendMessage(userMessage);
-      Message response = await ollamaService.sendChat(messages);
-
-      setState(() {
-        messages.add(response);
-      });
+      await ollamaService.sendChatUsingStream(messages);
     } catch (e) {
-      _showError("Failed to connect to Ollama: Make sure Ollama is running in the background");
-    } finally {
-      setState(() => _isLoading = false);
-      _scrollToBottom();
+      _showError("Failed to connect to Ollama: Make sure Ollama is running");
     }
   }
 
@@ -78,33 +72,40 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
+            child: ListView(
               controller: _scrollController,
-              itemCount: messages.length,
-              itemBuilder: (context, index) {
-                return ChatBubble(message: messages[index]);
-              },
+              children: [
+                ...messages.map((msg) => ChatBubble(message: msg)),
+                if (_isLoading)
+                  ResponseBubble(
+                    stream: ollamaService.responseStream,
+                    onComplete: (finalResponse) {
+                      setState(() {
+                        messages.add(Message(
+                          date: DateTime.now(),
+                          text: finalResponse,
+                          isUser: false,
+                        ));
+                        _isLoading = false;
+                      });
+                      _scrollToBottom();
+                    },
+                  ),
+              ],
             ),
           ),
-          if (_isLoading) // Show loading indicator when waiting for response
-            Padding(
-              padding: EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  LoadingAnimationWidget.waveDots(
-                    color: Theme.of(context).colorScheme.primary,
-                    size: 25,
-                  ),
-                  SizedBox(width: 8),
-                  Text("Ollama is writing", style: TextStyle(color: Theme.of(context).colorScheme.primary, fontSize: 18),)
-                ],
-              ),
-            ),
           _buildInputField(),
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    ollamaService.dispose();
+    _controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Widget _buildInputField() {
@@ -117,7 +118,9 @@ class _ChatScreenState extends State<ChatScreen> {
             width: MediaQuery.of(context).size.width * 0.4, // Limit width
             margin: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainer, // Background color
+              color: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainer, // Background color
               borderRadius: BorderRadius.circular(20), // Rounded corners
             ),
             child: TextField(
@@ -129,8 +132,10 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: InputDecoration(
                 hintText: 'Type a message...',
                 hintStyle: TextStyle(color: Colors.grey[700]),
-                border: InputBorder.none, // No border since it's wrapped in a container
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                border: InputBorder
+                    .none, // No border since it's wrapped in a container
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               ),
               onSubmitted: (_) => _sendMessage(),
             ),
